@@ -1,5 +1,6 @@
+// CpBody.js
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useContext } from "react";
 import axios from "axios";
 import { useCareerContext } from "@/contextapi/CareerContext";
 import { motion } from "framer-motion";
@@ -13,32 +14,6 @@ const CpBody = () => {
   const [error, setError] = useState("");
   const { isLoaded, isSignedIn, user } = useUser();
 
-  // Load data from localStorage on component mount
-  useEffect(() => {
-    if (user?.id) {
-      const storedData = localStorage.getItem(`career_data_${user.id}`);
-      if (storedData) {
-        const { careerGoal, roadmap } = JSON.parse(storedData);
-        setLocalCareerGoal(careerGoal);
-        setRoadmap(roadmap);
-        updateCareerGoal(careerGoal);
-      }
-    }
-  }, [user, updateCareerGoal]);
-
-  // Save data to localStorage
-  const saveToLocalStorage = (careerGoal, roadmap) => {
-    if (user?.id) {
-      localStorage.setItem(
-        `career_data_${user.id}`,
-        JSON.stringify({
-          careerGoal,
-          roadmap
-        })
-      );
-    }
-  };
-
   const handleInputChange = (e) => {
     setLocalCareerGoal(e.target.value);
   };
@@ -48,10 +23,8 @@ const CpBody = () => {
       alert("Please enter your career goal.");
       return;
     }
-
     setLoading(true);
     setError("");
-
     try {
       const response = await axios.post(
         "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2",
@@ -64,13 +37,9 @@ const CpBody = () => {
           },
         }
       );
-
       const generatedRoadmap = response.data[0].generated_text;
       setRoadmap(generatedRoadmap);
-      updateCareerGoal(localCareerGoal);
-      
-      // Save to localStorage after successful generation
-      saveToLocalStorage(localCareerGoal, generatedRoadmap);
+      updateCareerGoal(localCareerGoal); // Update the global career goal
     } catch (error) {
       console.error("Error generating roadmap:", error);
       setError("Failed to generate roadmap. Please try again.");
@@ -81,10 +50,10 @@ const CpBody = () => {
 
   const parseRoadmap = (roadmap) => {
     if (!roadmap) return [];
+
     const stages = [];
     let currentStage = null;
     const lines = roadmap.split("\n").filter((line) => line.trim() !== "");
-
     lines.forEach((line) => {
       const trimmedLine = line.trim();
       if (trimmedLine.startsWith("Stage")) {
@@ -110,7 +79,6 @@ const CpBody = () => {
         }
       }
     });
-
     if (currentStage && currentStage.description) {
       stages.push(currentStage);
     }
@@ -118,18 +86,13 @@ const CpBody = () => {
   };
 
   const handleEdit = () => {
-    setRoadmap(null); // Only clear the roadmap view, keep the data in localStorage
+    setRoadmap(null); // Clear the roadmap to show the input form again
   };
-
-  if (!isLoaded || !isSignedIn) {
-    return <div className="text-center">Please sign in to access your career roadmap.</div>;
-  }
-
   return (
     <div className="min-h-screen p-6 text-white">
       <div className="max-w-7xl mx-auto">
         <h2 className="text-3xl font-bold mb-12 text-center">
-          {user ? "Welcome " + user.username : "Username is not available"}
+          {user ? "Welcome " + user.username : "username is not available"}
         </h2>
 
         {!roadmap && (
@@ -146,14 +109,13 @@ const CpBody = () => {
               whileTap={{ scale: 0.95 }}
               onClick={generateRoadmap}
               disabled={loading}
-              className="text-white hover:text-gray-300 transition-colors bg-blue-600 px-6 py-2 rounded-lg hover:bg-blue-800"
+              className={`text-white hover:text-gray-300 transition-colors bg-blue-600 px-6 py-2 rounded-lg hover:bg-blue-800`}
             >
               {loading ? "Generating..." : "Generate Roadmap"}
             </motion.button>
             {error && <p className="text-red-500 mt-2">{error}</p>}
           </div>
         )}
-
         {roadmap && (
           <div className="mb-12 text-right">
             <motion.button
@@ -173,11 +135,16 @@ const CpBody = () => {
             <div className="space-y-16">
               {parseRoadmap(roadmap).map((stage, index) => (
                 <div key={`stage-${index}`} className="relative">
+                  {/* Connection dot */}
                   <div className="absolute -left-[60px] w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
                     <span className="text-white font-bold">{index + 1}</span>
                   </div>
+
+                  {/* Stage content */}
                   <div className="bg-white/5 backdrop-blur-lg rounded-2xl p-6 border border-white/10">
-                    <h3 className="text-xl font-semibold mb-4">{stage.title}</h3>
+                    <h3 className="text-xl font-semibold mb-4">
+                      {stage.title}
+                    </h3>
                     {stage.description && (
                       <p className="text-gray-300 mb-4">{stage.description}</p>
                     )}

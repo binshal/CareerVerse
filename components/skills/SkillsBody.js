@@ -21,7 +21,6 @@ const SkillsBody = () => {
         const { careerGoal, roadmap } = JSON.parse(careerData);
         setCareerGoal(careerGoal);
         
-        // Check if career goal has changed
         if (careerGoal !== previousGoal) {
           setPreviousGoal(careerGoal);
           handleCareerGoalChange(careerGoal, roadmap);
@@ -29,6 +28,45 @@ const SkillsBody = () => {
       }
     }
   }, [user, previousGoal]);
+
+  // Updated automatic day reduction effect
+  useEffect(() => {
+    // Initial check when component mounts
+    updateDaysLeft();
+
+    // Set up interval for periodic checks
+    const interval = setInterval(updateDaysLeft, 1000 * 60 * 60); // Check every hour
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const updateDaysLeft = () => {
+    setSkills(prevSkills => {
+      const now = new Date();
+      const updatedSkills = prevSkills.map(skill => {
+        if (!skill.lastUpdated) return skill;
+
+        const lastUpdated = new Date(skill.lastUpdated);
+        const daysDiff = Math.floor((now - lastUpdated) / (1000 * 60 * 60 * 24));
+
+        if (daysDiff >= 1) {
+          return {
+            ...skill,
+            daysLeft: Math.max(0, skill.daysLeft - daysDiff),
+            lastUpdated: now.toISOString()
+          };
+        }
+        return skill;
+      });
+
+      // Only save if there were actual changes
+      if (JSON.stringify(updatedSkills) !== JSON.stringify(prevSkills)) {
+        saveSkillsToStorage(updatedSkills);
+      }
+
+      return updatedSkills;
+    });
+  };
 
   const handleCareerGoalChange = (newGoal, roadmap) => {
     if (!roadmap) return;
@@ -39,8 +77,6 @@ const SkillsBody = () => {
     if (existingSkills) {
       const currentSkills = JSON.parse(existingSkills);
       const newSkills = generateInitialSkills(parsedRoadmap);
-      
-      // Merge existing skills with new skills
       const mergedSkills = mergeSkills(currentSkills, newSkills);
       setSkills(mergedSkills);
       saveSkillsToStorage(mergedSkills);
@@ -51,8 +87,30 @@ const SkillsBody = () => {
     }
   };
 
+  // Updated handleDaysUpdate to allow zero
+  const handleDaysUpdate = (skillIndex, days) => {
+    const numDays = parseInt(days);
+    if (isNaN(numDays) || numDays < 0) return; // Changed from < 1 to < 0 to allow zero
+
+    setSkills(prevSkills => {
+      const updatedSkills = prevSkills.map((skill, index) => {
+        if (index === skillIndex) {
+          return {
+            ...skill,
+            daysLeft: numDays,
+            lastUpdated: new Date().toISOString()
+          };
+        }
+        return skill;
+      });
+      saveSkillsToStorage(updatedSkills);
+      return updatedSkills;
+    });
+    setEditingDays(null);
+  };
+
+  // Rest of the utility functions remain the same
   const mergeSkills = (currentSkills, newSkills) => {
-    // Create a map of current skills for quick lookup
     const currentSkillsMap = new Map(
       currentSkills.map(skill => [skill.name.toLowerCase(), skill])
     );
@@ -60,7 +118,6 @@ const SkillsBody = () => {
     return newSkills.map(newSkill => {
       const existingSkill = currentSkillsMap.get(newSkill.name.toLowerCase());
       if (existingSkill) {
-        // Keep progress and days if skill exists
         return {
           ...newSkill,
           progress: existingSkill.progress,
@@ -71,36 +128,6 @@ const SkillsBody = () => {
       return newSkill;
     });
   };
-
-  // Add automatic day updates effect
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setSkills(prevSkills => {
-        const now = new Date();
-        const updatedSkills = prevSkills.map(skill => {
-          const lastUpdated = new Date(skill.lastUpdated);
-          const daysDiff = Math.floor((now - lastUpdated) / (1000 * 60 * 60 * 24));
-          
-          if (daysDiff >= 1) {
-            return {
-              ...skill,
-              daysLeft: Math.max(0, skill.daysLeft - daysDiff),
-              lastUpdated: now.toISOString()
-            };
-          }
-          return skill;
-        });
-
-        if (updatedSkills.some((skill, i) => skill.daysLeft !== prevSkills[i].daysLeft)) {
-          saveSkillsToStorage(updatedSkills);
-        }
-        
-        return updatedSkills;
-      });
-    }, 1000 * 60 * 60);
-
-    return () => clearInterval(interval);
-  }, []);
 
   const parseRoadmap = (roadmap) => {
     if (!roadmap) return [];
@@ -178,27 +205,6 @@ const SkillsBody = () => {
     });
   };
 
-  const handleDaysUpdate = (skillIndex, days) => {
-    const numDays = parseInt(days);
-    if (isNaN(numDays) || numDays < 1) return;
-
-    setSkills(prevSkills => {
-      const updatedSkills = prevSkills.map((skill, index) => {
-        if (index === skillIndex) {
-          return {
-            ...skill,
-            daysLeft: numDays,
-            lastUpdated: new Date().toISOString()
-          };
-        }
-        return skill;
-      });
-      saveSkillsToStorage(updatedSkills);
-      return updatedSkills;
-    });
-    setEditingDays(null);
-  };
-
   if (!isLoaded || !isSignedIn) {
     return <div className="text-center text-white">Please sign in to access your skills tracker.</div>;
   }
@@ -211,7 +217,6 @@ const SkillsBody = () => {
     );
   }
 
-  // Rest of the component remains the same...
   return (
     <div className="min-h-screen p-6">
       <div className="max-w-7xl mx-auto">
@@ -242,7 +247,7 @@ const SkillsBody = () => {
                           type="number"
                           className="w-16 bg-transparent border-b border-blue-400 text-center focus:outline-none"
                           defaultValue={skill.daysLeft}
-                          min="1"
+                          min="0"
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
                               handleDaysUpdate(index, e.target.value);

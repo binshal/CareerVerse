@@ -11,7 +11,7 @@ interface CustomSessionClaims {
   metadata?: SessionMetadata;
 }
 
-const isOnboardingRoute = createRouteMatcher(['/dashboard','/career-path','/skills','/mentor'])
+const isOnboardingRoute = createRouteMatcher(['/career-path','/dashboard','/skills','/mentor'])
 const isPublicRoute = createRouteMatcher(["/", "/about", "/sign-in(.*)", "/sign-up(.*)", "/api(.*)"])
 
 export default clerkMiddleware(async (auth, req: NextRequest) => {

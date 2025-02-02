@@ -12,7 +12,7 @@ export const AboutNav = () => {
               <motion.button
                 whileHover={{ scale: 1.07 }}
                 whileTap={{ scale: 0.95 }}
-                className="absolute top-4 right-28 md:right-4 text-white hover:text-gray-300 transition-colors bg-gray-600 px-6 py-2 rounded-lg hover:bg-gray-700"
+                className="absolute top-4 right-4 text-white hover:text-gray-300 transition-colors bg-gray-600 px-6 py-2 rounded-lg hover:bg-gray-700"
               >
                 Get Started
               </motion.button>
@@ -23,7 +23,7 @@ export const AboutNav = () => {
         animate={{ x: 0, opacity: 1 }}
         className="flex items-center space-x-2"
       >
-        <span className="hidden md:text-9xl md:mr-32 md:font-bold md:bg-gradient-to-r md:from-black md:to-black md:text-transparent md:bg-clip-text">
+        <span className="text-9xl mr-32 font-bold bg-gradient-to-r from-black to-black text-transparent bg-clip-text">
           CareerVerse <span className="text-white">Ai</span>
         </span>
       </motion.div>

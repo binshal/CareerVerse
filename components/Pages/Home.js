@@ -39,6 +39,7 @@ const Home = () => {
               </p>
             </div>
             <div className="space-x-4 pt-4">
+            <Link href={"/about"}>
               <motion.button
                 whileHover={{ scale: 1.07 }}
                 whileTap={{ scale: 0.95 }}
@@ -46,6 +47,7 @@ const Home = () => {
               >
                 ReadMore
               </motion.button>
+              </Link>
 
               <Link href={"/sign-in"}>
               <motion.button

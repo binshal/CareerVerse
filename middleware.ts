@@ -12,7 +12,7 @@ interface CustomSessionClaims {
 }
 
 const isOnboardingRoute = createRouteMatcher(['/dashboard','/career-path','/skills','/mentor'])
-const isPublicRoute = createRouteMatcher(["/", "/sign-in(.*)", "/sign-up(.*)", "/api(.*)"])
+const isPublicRoute = createRouteMatcher(["/", "/about", "/sign-in(.*)", "/sign-up(.*)", "/api(.*)"])
 
 export default clerkMiddleware(async (auth, req: NextRequest) => {
   const { userId, sessionClaims, redirectToSignIn } = await auth()

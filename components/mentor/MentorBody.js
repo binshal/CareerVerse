@@ -1,119 +1,181 @@
 "use client";
-
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
+import axios from "axios";
 import { Send, StopCircle, Bot, User } from "lucide-react";
 import { motion } from "framer-motion";
+import { useUser } from "@clerk/nextjs";
 
 export default function MentorBody() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState("");
+  const [careerGoal, setCareerGoal] = useState(""); // State to store the user's career goal
+  const { isLoaded, isSignedIn, user } = useUser();
 
-  const handleSubmit = (e) => {
+  // Fetch careerGoal from local storage on component mount
+  useEffect(() => {
+    if (user?.id) {
+      const storedData = localStorage.getItem(`career_data_${user.id}`);
+      if (storedData) {
+        const { careerGoal } = JSON.parse(storedData);
+        setCareerGoal(careerGoal);
+      }
+    }
+  }, [user]);
+
+  // Function to handle message submission
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!input.trim()) return;
 
+    // Check if the user has set a career goal
+    if (!careerGoal) {
+      setError("Please set your career goal in the Career Path section.");
+      return;
+    }
+
+    // Add user message to the chat
     setMessages((prev) => [...prev, { content: input, isAI: false }]);
     setIsGenerating(true);
+    setError(""); // Clear any previous errors
     setInput("");
 
-    setTimeout(() => {
-      setMessages((prev) => [
-        ...prev,
+    try {
+      // Generate AI response using Hugging Face API
+      const response = await axios.post(
+        "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2",
         {
-          content: `Great question about ${input}! Here's a detailed response with career advice...`,
-          isAI: true,
+          inputs: `You are a professional career mentor. Provide clear and concise advice for someone with the career goal: "${careerGoal}". Question: ${input}. Format the response professionally with bullet points or sections where applicable.`,
         },
-      ]);
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.NEXT_PUBLIC_HF_TOKEN}`,
+          },
+        }
+      );
+
+      let aiResponse = response.data[0]?.generated_text || "No response available.";
+
+      // Remove unwanted prefix from the response
+      const prefixToRemove = `You are a professional career mentor. Provide clear and concise advice for someone with the career goal: "${careerGoal}". Question: ${input}. Format the response professionally with bullet points or sections where applicable.`;
+      if (aiResponse.startsWith(prefixToRemove)) {
+        aiResponse = aiResponse.slice(prefixToRemove.length).trim();
+      }
+
+      setMessages((prev) => [...prev, { content: aiResponse, isAI: true }]);
+    } catch (err) {
+      console.error("Error generating AI response:", err);
+      setError("Failed to generate a response. Please try again.");
+    } finally {
       setIsGenerating(false);
-    }, 1500);
+    }
   };
 
+  // Function to parse and format AI response
+  const formatAIResponse = (content) => {
+    // Replace newlines with <br> for better rendering
+    return content.split("\n").map((line, index) => {
+      if (line.startsWith("-")) {
+        // Render bullet points
+        return (
+          <li key={index} className="ml-4 list-disc">
+            {line.substring(1).trim()}
+          </li>
+        );
+      }
+      // Render normal text
+      return <p key={index}>{line}</p>;
+    });
+  };
+
+  if (!isLoaded || !isSignedIn) {
+    return <div className="text-center text-white">Please sign in to access the mentor.</div>;
+  }
+
+  if (!careerGoal) {
+    return (
+      <div className="text-center text-white">
+        Please set your career goal in the Career Path section first.
+      </div>
+    );
+  }
+
   return (
-    <div className=" text-gray-100 p-8">
-      <div className="max-w-3xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8">AI Career Mentor</h1>
+    <div className="flex flex-col h-full w-full max-w-4xl mx-auto p-4 text-white">
+      {/* Header */}
+      <h1 className="text-2xl font-bold mb-4 text-center">AI Career Mentor</h1>
 
-        <motion.div
-          initial={{ opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 h-[350px] flex flex-col border border-white/20"
-        >
-          <div className="flex-1 overflow-y-auto mb-6 space-y-4 scrollable-div">
-            {messages.map((message, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, x: message.isAI ? -20 : 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className={`flex ${message.isAI ? "justify-start" : "justify-end"}`}
-              >
-                <div
-                  className={`max-w-[80%] p-4 rounded-xl border border-white/10 ${
-                    message.isAI ? "bg-gray-700" : "bg-blue-600"
-                  }`}
-                >
-                  <div className="flex items-center space-x-2 mb-2">
-                    {message.isAI ? (
-                      <Bot size={20} className="text-green-400" />
-                    ) : (
-                      <User size={20} className="text-blue-300" />
-                    )}
-                    <span className="text-sm font-medium">
-                      {message.isAI ? "Career AI" : "You"}
-                    </span>
-                  </div>
-                  <p className="text-gray-100">{message.content}</p>
-                </div>
-              </motion.div>
-            ))}
-
-            {isGenerating && (
-              <div className="flex items-center space-x-2 text-gray-400 animate-pulse">
-                <Bot size={20} className="text-green-400" />
-                <span>AI is generating response...</span>
-              </div>
-            )}
-          </div>
-
-          <form onSubmit={handleSubmit} className="relative">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask me anything about your career path..."
-              className="w-full p-4 pr-16 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 border border-white/20"
-              disabled={isGenerating}
-            />
-            <button
-              type="submit"
-              className="absolute right-4 top-1/2 -translate-y-1/2"
-              disabled={isGenerating}
+      {/* Chat Messages */}
+      <div className="flex-grow overflow-y-auto space-y-4">
+        {messages.map((message, index) => (
+          <motion.div
+            key={index}
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className={`flex items-start gap-2 ${
+              message.isAI ? "justify-center" : "justify-end"
+            }`}
+          >
+            <div
+              className={`rounded-lg px-6 py-4 max-w-2xl ${
+                message.isAI
+                  ? "bg-gray-800 text-white self-center shadow-lg"
+                  : "bg-gray-700 text-white self-end shadow-lg"
+              }`}
             >
-              {isGenerating ? (
-                <StopCircle className="text-red-400" />
+              {message.isAI ? (
+                <div className="space-y-2">{formatAIResponse(message.content)}</div>
               ) : (
-                <Send className="text-blue-400" />
+                <p>{message.content}</p>
               )}
-            </button>
-          </form>
-        </motion.div>
+            </div>
+            {message.isAI ? (
+              <Bot size={16} className="text-gray-400" />
+            ) : (
+              <User size={16} className="text-gray-400" />
+            )}
+          </motion.div>
+        ))}
+        {isGenerating && (
+          <div className="text-center text-gray-400">AI is generating response...</div>
+        )}
+        {error && <div className="text-red-500 text-center">{error}</div>}
+      </div>
 
-        <motion.div 
-          initial={{ opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4"
+      {/* Input Box */}
+      <form onSubmit={handleSubmit} className="flex gap-2 mt-4">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Ask me anything about your career path..."
+          className="w-full p-4 pr-16 bg-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 border border-white/20"
+          disabled={isGenerating}
+        />
+        <button
+          type="submit"
+          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          disabled={isGenerating}
         >
-          {["Improve Python skills", "Recommended certifications", "AI Career Paths", "Market Trends"].map((text, index) => (
-            <motion.button
+          {isGenerating ? <StopCircle size={16} /> : <Send size={16} />}
+        </button>
+      </form>
+
+      {/* Suggestions */}
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        {["Improve Python skills", "Recommended certifications", "AI Career Paths", "Market Trends"].map(
+          (text, index) => (
+            <button
               key={index}
-              whileHover={{ scale: 1.05 }}
               onClick={() => setInput(text)}
               className="p-3 bg-white/10 rounded-lg hover:bg-white/20 transition-colors text-sm border border-white/10"
             >
               {text}
-            </motion.button>
-          ))}
-        </motion.div>
+            </button>
+          )
+        )}
       </div>
     </div>
   );
